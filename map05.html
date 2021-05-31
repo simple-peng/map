@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <title>启发式搜索</title>
+
+  <style type="text/css">
+  .cell{
+    display:inline-block;
+    line-height: 7px;
+    width: 6px;
+    height: 6px;
+    background-color: gray;
+    border-bottom: solid 1px white;
+    border-right: solid 1px white;
+    vertical-align: middle;
+  }
+  #container{
+    width:701px
+  }
+  </style>
+</head>
+
+<body>
+  <div id="container"></div>
+  <button onclick="localStorage['map'] = JSON.stringify(map)">save</button>
+  <script type="text/javascript">
+  function sleep(t){
+    return new Promise((resolve,reject)=>{
+      setTimeout(resolve,t)
+    })
+  }
+
+  class Sorted {
+    constructor(data,compare){
+      this.data = data.slice();
+      this.compare = compare || ((a,b) => a - b);
+    }
+
+    /*
+    * 保证每次拿出来的数字是最小的
+    * 启发式函数所使用的估计的估值只要能够一定小于点到终点的路径，那么它就是一个一定能找到最优路径的启发式寻路
+    */
+    take(){
+      if(!this.data.length) return
+      let min = this.data[0]
+      let minIndex = 0;
+
+      for(let i = 1;i < this.data.length;i++){
+        if(this.compare(this.data[i],min) < 0){
+          min = this.data[i]
+          minIndex = i
+        }
+      }
+      //返回最小值，删除最小值
+      this.data[minIndex] = this.data[this.data.length - 1]
+      this.data.pop()
+      return min
+    }
+
+    insert(v){
+      this.data.push(v)
+    }
+  }
+
+  let map = localStorage['map']?JSON.parse(localStorage['map']):Array(10000).fill(0)
+  let container = document.getElementById("container")
+  /*
+  * 寻找路径
+  * @param map:地图
+  * @param start:起点
+  * @param end:终点
+  */
+  async function findPath(map,start,end){
+    let queue = new Sorted([start],(a,b)=>distance(a) - distance(b));
+    // let queue = [start]
+    let table = Object.create(map)
+
+    /*
+      * 计算两点间的距离
+      * @param point:
+      */
+    function distance(point){
+      return (point[0] - end[0])**2 + (point[1] - end[1])**2
+    }
+     /*
+      * 插入点
+      * @param x:x坐标
+      * @param y:y坐标
+      * @param pre:上一个点
+      */
+    async function insert(x,y,pre){
+      if(x < 0 || y < 0 || x > 100 || y > 100) return
+      if(map[100*y + x]) return
+      if(table[100*y + x]) return
+      
+      //视觉化广度优先搜索
+      // await sleep(30)
+      map[100*y + x] = 2
+      container.children[y*100 + x].style.backgroundColor = "lightgreen"
+
+      //存储上一个节点
+      table[100*y + x] = pre
+
+      // queue.push([x,y])
+      queue.insert([x,y])
+    }
+
+    //广度优先搜索
+    // console.log('queue:',queue,queue.length)
+    while(queue.data.length){
+      let [x,y] = queue.take()
+      console.log([x,y])
+      //改成深度优先
+      // let [x,y] = queue.pop()
+      if(x === end[0] && y === end[1]) {
+        let path = []
+        while(x !=start[0] || y !=start[1]){
+          path.push(map[y*100 + x])
+          // console.log(x,y)
+          await sleep(20)
+          container.children[y*100 + x].style.backgroundColor = "purple"
+          x = table[y*100 + x][0] 
+          y = table[y*100 + x][1] 
+          // console.log(x,y)
+        }
+        return path;
+      }
+      // await insert(x,y,[x,y]);
+      await insert(x-1,y,[x,y]);
+      await insert(x,y-1,[x,y]);
+      await insert(x+1,y,[x,y]);
+      await insert(x,y+1,[x,y]);
+
+      // await insert(x-1,y-1,[x,y]);
+      // await insert(x+1,y-1,[x,y]);
+      // await insert(x-1,y+1,[x,y]);
+      // await insert(x+1,y+1,[x,y]);
+    }
+    return null
+  }
+  
+  let mousedown = false,clear = false;
+  for(let y = 0;y < 100;y++){
+    for(let x = 0;x < 100;x++){
+      let cell = document.createElement("div")
+      cell.classList.add("cell")
+
+      //渲染localStorage
+      if(map[100*y + x] == 1){
+        cell.style.backgroundColor = "black"
+      }
+
+      cell.addEventListener("mousemove",e => {
+        if(mousedown){
+          if(clear){
+            cell.style.backgroundColor = ""
+            map[100*y + x] = 0
+          }else{
+            cell.style.backgroundColor = "black"
+            map[100*y + x] = 1
+          }
+        }
+      })
+      container.appendChild(cell)
+    }
+  }
+
+  document.addEventListener("mousedown",e => {
+    mousedown = true;
+    clear = (e.which === 3)
+  })
+  document.addEventListener("mouseup",e => {
+    mousedown = false;
+  })
+  // document.addEventListener("contextmenu",e => e.preventDefault())
+  </script>
+</body>
+</html>
